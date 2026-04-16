@@ -59,6 +59,7 @@ export interface Pedido {
   cliente?: string;
   observaciones?: string;
   items: PedidoDetalle[];
+  pagado?: boolean;
 }
 
 export interface Pago {
@@ -75,5 +76,6 @@ export interface MovimientoCaja {
   monto: number;
   descripcion: string;
   fecha: string;
-  userId: string;
+  userId?: string;
+  categoria?: string;
 }

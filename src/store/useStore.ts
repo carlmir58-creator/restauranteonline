@@ -39,7 +39,7 @@ interface AppState {
   actualizarItemCantidad: (pedidoId: string, itemId: string, cantidad: number) => Promise<boolean>;
 
   // Pago actions
-  procesarPago: (pago: Omit<Pago, 'id' | 'fecha'>) => Promise<void>;
+  procesarPago: (pago: Omit<Pago, 'id' | 'fecha'> & { recibido?: number; propina?: number }) => Promise<Pago | undefined>;
 
   // Admin actions
   addProducto: (p: Omit<Producto, 'id'>) => Promise<void>;
@@ -47,7 +47,7 @@ interface AppState {
   addMesa: (m: Omit<Mesa, 'id'>) => Promise<void>;
   addUser: (u: Omit<User, 'id'>) => Promise<void>;
   updateUser: (id: string, changes: Partial<Pick<User, 'rol' | 'activo'>>) => Promise<void>;
-  addMovimientoCaja: (m: Omit<MovimientoCaja, 'id' | 'fecha'>) => Promise<void>;
+  addMovimientoCaja: (m: Omit<MovimientoCaja, 'id' | 'fecha' | 'userId'>) => Promise<void>;
   subscribeToChanges: () => () => void;
 }
 
@@ -192,7 +192,7 @@ export const useStore = create<AppState>((set, get) => ({
             descripcion: p.descripcion,
             precio: Number(p.precio),
             categoriaId: p.categoria_id,
-            area: cat?.area_produccion || 'cocina', // Tomar área de la categoría
+            area: (cat?.nombre.toLowerCase().includes('bebida') || cat?.area_produccion === 'barra') ? 'barra' : 'cocina',
             activo: p.activo,
             imagenUrl: p.imagen_url,
             disponible: p.disponible,
@@ -216,21 +216,22 @@ export const useStore = create<AppState>((set, get) => ({
         }))
       });
 
-      // Fetch active orders (not paid)
-      const { data: activePedidos } = await supabase
+      // Fetch active orders OR orders from today
+      const { data: recentPedidos } = await supabase
         .from('pedidos')
         .select('*, pedido_detalles(*)')
-        .eq('pagado', false);
+        .or(`pagado.eq.false,fecha.gte.${new Date(new Date().setHours(0,0,0,0)).toISOString()}`);
 
-      if (activePedidos) {
+      if (recentPedidos) {
         set({
-          pedidos: activePedidos.map(p => ({
+          pedidos: recentPedidos.map(p => ({
             id: p.id,
             mesaId: p.mesa_id,
             meseroId: p.mesero_id,
             fecha: p.fecha,
             cliente: p.cliente,
             observaciones: p.observaciones,
+            pagado: p.pagado,
             items: p.pedido_detalles.map((d: any) => ({
               id: d.id,
               pedidoId: d.pedido_id,
@@ -257,6 +258,26 @@ export const useStore = create<AppState>((set, get) => ({
   signIn: async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error };
+
+    // Verificar si el perfil existe y está activo
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from('perfiles')
+        .select('activo, nombre')
+        .eq('id', data.user.id)
+        .single();
+
+      if (!profile) {
+        await supabase.auth.signOut();
+        return { error: { message: 'Perfil no encontrado. Contacta al administrador.' } };
+      }
+
+      if (!profile.activo) {
+        await supabase.auth.signOut();
+        return { error: { message: 'Tu cuenta está pendiente de activación. Contacta al administrador.' } };
+      }
+    }
+
     return { error: null };
   },
 
@@ -432,45 +453,49 @@ export const useStore = create<AppState>((set, get) => ({
       metodo_pago: pagoData.metodoPago
     }).select().single();
 
-    if (error || !pago) return;
-
-    // Update all items as 'cobrado', mark order as paid, and update mesa
-    const { error: updateErrors } = await Promise.all([
-      supabase.from('pedidos').update({ pagado: true }).eq('id', pagoData.pedidoId),
-      supabase.from('pedido_detalles').update({ estado: 'cobrado' }).eq('pedido_id', pagoData.pedidoId),
-    ]).then(([res1, res2]) => ({ error: res1.error || res2.error }));
-
-    if (updateErrors) {
-      toast.error('Error al actualizar el estado del pedido');
+    if (error || !pago) {
+      toast.error('Error al registrar el pago');
       return;
     }
 
+    // Update all items as 'cobrado' and mark order as paid
+    await Promise.all([
+      supabase.from('pedidos').update({ pagado: true }).eq('id', pagoData.pedidoId),
+      supabase.from('pedido_detalles').update({ estado: 'cobrado' }).eq('pedido_id', pagoData.pedidoId),
+    ]);
+
+    // Get pedido & mesa from store BEFORE removing from state
     const pedido = get().pedidos.find(p => p.id === pagoData.pedidoId);
+    const mesa   = pedido ? get().mesas.find(m => m.id === pedido.mesaId) : null;
+
     if (pedido) {
       await get().updateMesaEstado(pedido.mesaId, 'disponible');
     }
 
-    // Add to cash flow
+    // Register in movimientos_caja
     await get().addMovimientoCaja({
       tipo: 'ingreso',
       monto: pagoData.montoTotal,
-      descripcion: `Venta Mesa ${mesa?.numero || '?'}, Pedido ${pedido?.id.slice(0,8)}`,
+      descripcion: `Venta Mesa #${mesa?.numero ?? '?'} — Pedido ${pedido?.id.slice(0, 8).toUpperCase() ?? ''}`,
       categoria: 'venta'
     });
 
+    const nuevoPago: Pago = {
+      id: pago.id,
+      pedidoId: pago.pedido_id,
+      montoTotal: Number(pago.monto_total),
+      metodoPago: pago.metodo_pago,
+      fecha: pago.fecha
+    };
+
     set(s => ({
-      pedidos: s.pedidos.filter(p => p.id !== pagoData.pedidoId),
-      pagos: [
-        {
-          id: pago.id,
-          pedidoId: pago.pedido_id,
-          montoTotal: Number(pago.monto_total),
-          metodoPago: pago.metodo_pago,
-          fecha: pago.fecha
-        },
-        ...s.pagos
-      ]
+      // No eliminamos el pedido, solo lo marcamos como pagado en el estado local 
+      // para que aparezca en los historiales de los roles
+      pedidos: s.pedidos.map(p => p.id === pagoData.pedidoId ? { ...p, pagado: true } : p),
+      pagos: [nuevoPago, ...s.pagos]
     }));
+
+    return nuevoPago;
   },
 
   addProducto: async (p) => {
@@ -509,13 +534,27 @@ export const useStore = create<AppState>((set, get) => ({
 
   updateUser: async (id, changes) => {
     const { error } = await supabase.from('perfiles').update(changes).eq('id', id);
+    
     if (error) {
-      toast.error('Error al actualizar usuario: ' + error.message);
+      console.error('Error Supabase:', error);
+      toast.error('Error al actualizar: ' + (error.message || 'No tienes permisos suficientes'));
       return;
     }
+
+    // Actualizar localmente en la lista de todos los usuarios
     set(s => ({
       users: s.users.map(u => u.id === id ? { ...u, ...changes } : u)
     }));
+
+    // CRITICO: Si el usuario que estamos cambiando es el que tiene la sesión iniciada,
+    // debemos actualizar su estado de currentUser también
+    if (get().currentUser?.id === id) {
+      set(s => ({
+        currentUser: s.currentUser ? { ...s.currentUser, ...changes } : null
+      }));
+    }
+    
+    toast.success('Cambio guardado en la base de datos');
   },
 
   addMovimientoCaja: async (m) => {
