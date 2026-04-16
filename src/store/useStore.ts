@@ -265,7 +265,8 @@ export const useStore = create<AppState>((set, get) => ({
       email, 
       password,
       options: {
-        data: { full_name: nombre }
+        data: { full_name: nombre },
+        emailRedirectTo: window.location.origin
       }
     });
     if (error) return { error };
