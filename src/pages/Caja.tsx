@@ -26,27 +26,29 @@ const Caja = () => {
   const recibidoVal = parseFloat(recibido) || 0;
   const cambio = recibidoVal - total;
 
-  const handleCobrar = () => {
+  const handleCobrar = async () => {
     if (!pedido) return;
     if (metodo === 'efectivo' && recibidoVal < total) {
       toast.error('El monto recibido es menor al total');
       return;
     }
-    procesarPago({
-      pedidoId: pedido.id,
-      monto: total,
-      impuesto,
-      propina: propinaVal,
-      metodo,
-      recibido: metodo === 'efectivo' ? recibidoVal : undefined,
-      cambio: metodo === 'efectivo' ? cambio : undefined,
-      referencia: metodo === 'transferencia' ? referencia : undefined,
-    });
-    toast.success('Pago procesado exitosamente');
-    setSelectedPedido(null);
-    setRecibido('');
-    setPropina('');
-    setReferencia('');
+    
+    try {
+      await procesarPago({
+        pedidoId: pedido.id,
+        montoTotal: total,
+        metodoPago: metodo,
+      });
+      
+      toast.success('Pago procesado exitosamente');
+      setSelectedPedido(null);
+      setRecibido('');
+      setPropina('');
+      setReferencia('');
+    } catch (error) {
+      console.error('Error al procesar pago:', error);
+      toast.error('Hubo un error al procesar el pago');
+    }
   };
 
   return (

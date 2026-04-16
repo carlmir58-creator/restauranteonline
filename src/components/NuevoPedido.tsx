@@ -48,17 +48,34 @@ const NuevoPedido = ({ mesaId, onClose }: Props) => {
     setCart(c => c.filter(i => i.productoId !== productoId));
   };
 
-  const handleEnviar = () => {
+  const handleEnviar = async () => {
     if (cart.length === 0 && !pedidoActivo) return;
+    
     let pedidoId = pedidoActivo?.id;
-    if (!pedidoId) {
-      pedidoId = crearPedido(mesaId, cliente || undefined, notas || undefined);
+    
+    try {
+      if (!pedidoId) {
+        // AHORA ESPERAMOS a que Supabase nos devuelva el ID real
+        pedidoId = await crearPedido(mesaId, cliente || undefined, notas || undefined) || undefined;
+      }
+      
+      if (!pedidoId) {
+        toast.error('No se pudo obtener un ID de pedido válido');
+        return;
+      }
+
+      // Enviamos cada item uno por uno esperando su confirmación
+      for (const item of cart) {
+        await agregarItem(pedidoId, item.productoId, item.cantidad, item.notas);
+      }
+
+      setCart([]);
+      onClose(); // Cerrar al terminar con éxito
+      toast.success('Pedido enviado con éxito');
+    } catch (error) {
+      console.error('Error al procesar el envío:', error);
+      toast.error('Hubo un error al procesar el pedido');
     }
-    cart.forEach(item => {
-      agregarItem(pedidoId!, item.productoId, item.cantidad, item.notas);
-    });
-    setCart([]);
-    toast.success('Pedido enviado a cocina/barra');
   };
 
   const handleEliminarItem = (itemId: string) => {

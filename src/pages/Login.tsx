@@ -1,68 +1,117 @@
 import { useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { UtensilsCrossed, LogIn } from 'lucide-react';
+import { UtensilsCrossed, LogIn, UserPlus } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Login = () => {
-  const { users, login } = useStore();
-  const [selectedUser, setSelectedUser] = useState('');
+  const { signIn, signUp } = useStore();
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const roleLabels: Record<string, string> = {
-    admin: 'Administrador',
-    mesero: 'Mesero',
-    cajero: 'Cajero',
-    cocina: 'Cocina',
-    barra: 'Barra',
-  };
-
-  const roleColors: Record<string, string> = {
-    admin: 'from-primary to-blue-700',
-    mesero: 'from-emerald-600 to-emerald-800',
-    cajero: 'from-amber-500 to-amber-700',
-    cocina: 'from-orange-500 to-orange-700',
-    barra: 'from-purple-500 to-purple-700',
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    if (isLogin) {
+      const { error } = await signIn(email, password);
+      if (error) {
+        toast.error('Error al iniciar sesión: ' + error.message);
+      }
+    } else {
+      if (!nombre) {
+        toast.error('Por favor ingresa tu nombre');
+        setLoading(false);
+        return;
+      }
+      const { error } = await signUp(email, password, nombre);
+      if (error) {
+        toast.error('Error al registrarse: ' + error.message);
+      } else {
+        toast.success('Registro exitoso. Debes esperar a que el administrador active tu cuenta.');
+        setIsLogin(true);
+      }
+    }
+    setLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">
-            <UtensilsCrossed className="w-8 h-8 text-primary" />
+        <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-primary/10 mb-6 group hover:scale-105 transition-transform duration-300">
+            <UtensilsCrossed className="w-10 h-10 text-primary group-hover:rotate-12 transition-transform" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground">RestoPOS</h1>
-          <p className="text-muted-foreground mt-1">Sistema de Punto de Venta</p>
+          <h1 className="text-4xl font-extrabold text-foreground tracking-tight">Comanda|POS</h1>
+          <p className="text-muted-foreground mt-2 text-lg">Sistema de Gestión para restaurantes</p>
         </div>
 
-        <div className="pos-card space-y-3">
-          <p className="text-sm text-muted-foreground font-medium mb-4">Selecciona tu usuario</p>
-          {users.filter(u => u.activo).map(user => (
-            <button
-              key={user.id}
-              onClick={() => setSelectedUser(user.id)}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                selectedUser === user.id
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border hover:border-muted-foreground/30 hover:bg-accent'
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${roleColors[user.rol]} flex items-center justify-center text-sm font-bold text-white`}>
-                {user.nombre.charAt(0)}
+        <div className="pos-card border-border/50 backdrop-blur-sm shadow-2xl space-y-6 p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {!isLogin && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                <label className="text-sm font-semibold text-foreground/80 ml-1">Nombre Completo</label>
+                <input
+                  type="text"
+                  required
+                  value={nombre}
+                  onChange={e => setNombre(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground"
+                  placeholder="Tu nombre"
+                />
               </div>
-              <div className="text-left flex-1">
-                <p className="font-medium text-foreground text-sm">{user.nombre}</p>
-                <p className="text-xs text-muted-foreground">{roleLabels[user.rol]}</p>
+            )}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground/80 ml-1">Correo Electrónico</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground"
+                placeholder="ejemplo@restaurante.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center ml-1">
+                <label className="text-sm font-semibold text-foreground/80">Contraseña</label>
               </div>
-            </button>
-          ))}
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground"
+                placeholder="••••••••"
+              />
+            </div>
 
-          <button
-            onClick={() => selectedUser && login(selectedUser)}
-            disabled={!selectedUser}
-            className="pos-btn-primary w-full mt-4"
-          >
-            <LogIn className="w-4 h-4" />
-            Ingresar
-          </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="pos-btn-primary w-full py-4 rounded-xl text-base font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 active:scale-[0.98] transition-all disabled:opacity-50 mt-2"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+              ) : (
+                <>
+                  {isLogin ? <LogIn className="w-5 h-5 mr-2" /> : <UserPlus className="w-5 h-5 mr-2" />}
+                  {isLogin ? 'Ingresar al Sistema' : 'Crear Cuenta'}
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="pt-2 text-center text-sm">
+            <button 
+              onClick={() => setIsLogin(!isLogin)}
+              className="text-primary font-semibold hover:underline"
+            >
+              {isLogin ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

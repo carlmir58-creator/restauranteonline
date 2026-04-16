@@ -1,8 +1,11 @@
+import { useEffect } from "react";
+import { UtensilsCrossed } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useStore } from "@/store/useStore";
+import { supabase } from "@/lib/supabase";
 import Layout from "@/components/Layout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -26,9 +29,58 @@ const defaultRoutes: Record<string, string> = {
 };
 
 const AppRoutes = () => {
-  const { currentUser } = useStore();
+  const { currentUser, setSession, fetchInitialData, subscribeToChanges, isLoading } = useStore();
+
+  useEffect(() => {
+    // 1. Obtener sesión inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    // 2. Escuchar cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    fetchInitialData();
+    const unsubscribe = subscribeToChanges();
+    
+    return () => {
+      subscription.unsubscribe();
+      unsubscribe();
+    };
+  }, [fetchInitialData, subscribeToChanges, setSession]);
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   if (!currentUser) return <Login />;
+
+  if (!currentUser.activo) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-background p-4 text-center">
+        <div className="w-20 h-20 rounded-full bg-yellow-500/10 flex items-center justify-center mb-6">
+          <UtensilsCrossed className="w-10 h-10 text-yellow-500 animate-pulse" />
+        </div>
+        <h1 className="text-2xl font-bold mb-2">Cuenta Pendiente de Activación</h1>
+        <p className="text-muted-foreground max-w-sm mb-8">
+          Tu cuenta ha sido creada con éxito, pero aún no ha sido activada por un administrador.
+          Por favor, contacta a la gerencia para obtener acceso.
+        </p>
+        <button 
+          onClick={() => useStore.getState().signOut()}
+          className="pos-btn-secondary px-8 py-2 rounded-xl"
+        >
+          Cerrar Sesión
+        </button>
+      </div>
+    );
+  }
 
   const role = currentUser.rol;
   const defaultRoute = defaultRoutes[role] || '/';

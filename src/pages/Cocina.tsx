@@ -20,13 +20,15 @@ const Cocina = () => {
       }))
   );
 
-  const handleIniciar = (pedidoId: string, itemId: string) => {
-    actualizarItemEstado(pedidoId, itemId, 'en_preparacion');
+  const handleIniciar = async (pedidoId: string, itemId: string) => {
+    await actualizarItemEstado(pedidoId, itemId, 'en_preparacion');
+    // El toast de éxito ya no es necesario aquí si lo hace el store, 
+    // pero lo dejamos para feedback inmediato.
     toast.success('Preparación iniciada');
   };
 
-  const handleListo = (pedidoId: string, itemId: string) => {
-    actualizarItemEstado(pedidoId, itemId, 'listo');
+  const handleListo = async (pedidoId: string, itemId: string) => {
+    await actualizarItemEstado(pedidoId, itemId, 'listo');
     toast.success('¡Producto listo!');
   };
 
