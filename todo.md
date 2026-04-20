@@ -42,6 +42,14 @@
 - [x] Badges de estado y estadísticas (total / activos / pendientes).
 - [x] Fix: import `UtensilsCrossed` faltante en `App.tsx`.
 
+## 📝 Fase 4.6: Ajustes de Comandas y Caja (Completado ✅)
+
+- [x] Implementar notas detalladas por producto para cocina/barra.
+- [x] Añadir campo de observaciones generales por pedido.
+- [x] Mejorar la edición de notas con interfaz inline (sin prompts).
+- [x] Habilitar registro de gastos diversos (nómina, transporte, otros) en Caja.
+- [x] Sincronizar categorías de egresos entre UI y Base de Datos.
+
 ## 📈 Fase 5: Mejoras Funcionales y Pulido (Pendiente ⬜)
 
 - [ ] Sistema de impresión de tickets (`react-to-print`).
