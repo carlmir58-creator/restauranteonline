@@ -113,6 +113,11 @@ const Login = () => {
             </button>
           </div>
         </div>
+        
+        <div className="text-center mt-8 text-xs text-muted-foreground animate-in fade-in slide-in-from-bottom-2 duration-1000 delay-300">
+          <p>© 2026 Carlos Miranda • carlmir58@gmail.com</p>
+          <p className="mt-1">Todos los derechos reservados.</p>
+        </div>
       </div>
     </div>
   );

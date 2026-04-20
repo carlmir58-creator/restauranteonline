@@ -37,6 +37,7 @@ interface AppState {
   eliminarItem: (pedidoId: string, itemId: string) => Promise<boolean>;
   actualizarItemEstado: (pedidoId: string, itemId: string, estado: ItemEstado) => Promise<void>;
   actualizarItemCantidad: (pedidoId: string, itemId: string, cantidad: number) => Promise<boolean>;
+  actualizarItemNotas: (pedidoId: string, itemId: string, notas: string) => Promise<boolean>;
 
   // Pago actions
   procesarPago: (pago: Omit<Pago, 'id' | 'fecha'> & { recibido?: number; propina?: number }) => Promise<Pago | undefined>;
@@ -148,6 +149,21 @@ export const useStore = create<AppState>((set, get) => ({
           }));
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'movimientos_caja' }, (payload) => {
+        console.log('%c[Realtime] Evento en Movimientos:', 'color: #3ecf8e', payload);
+        if (payload.eventType === 'INSERT') {
+          const newMov = {
+            id: payload.new.id,
+            tipo: payload.new.tipo,
+            monto: Number(payload.new.monto),
+            descripcion: payload.new.descripcion,
+            categoria: payload.new.categoria,
+            fecha: payload.new.fecha,
+            userId: payload.new.usuario_id
+          };
+          set(s => ({ movimientosCaja: [newMov, ...s.movimientosCaja] }));
+        }
+      })
       .subscribe((status) => {
         console.log('%c[Supabase Realtime] Estado:', 'color: #3ecf8e; font-weight: bold', status);
       });
@@ -166,13 +182,15 @@ export const useStore = create<AppState>((set, get) => ({
         { data: categorias },
         { data: productos },
         { data: perfiles },
-        { data: pagos }
+        { data: pagos },
+        { data: movimientos_caja }
       ] = await Promise.all([
         supabase.from('mesas').select('*').order('numero'),
         supabase.from('categorias').select('*').order('orden_visual'),
         supabase.from('productos').select('*').order('nombre'),
         supabase.from('perfiles').select('*'),
-        supabase.from('pagos').select('*').order('fecha', { ascending: false })
+        supabase.from('pagos').select('*').order('fecha', { ascending: false }),
+        supabase.from('movimientos_caja').select('*').order('fecha', { ascending: false })
       ]);
 
       set({
@@ -213,6 +231,15 @@ export const useStore = create<AppState>((set, get) => ({
           montoTotal: Number(p.monto_total),
           metodoPago: p.metodo_pago,
           fecha: p.fecha
+        })),
+        movimientosCaja: (movimientos_caja || []).map(m => ({
+          id: m.id,
+          tipo: m.tipo,
+          monto: Number(m.monto),
+          descripcion: m.descripcion,
+          categoria: m.categoria,
+          fecha: m.fecha,
+          userId: m.usuario_id
         }))
       });
 
@@ -446,6 +473,20 @@ export const useStore = create<AppState>((set, get) => ({
     return true;
   },
 
+  actualizarItemNotas: async (pedidoId, itemId, notas) => {
+    const { error } = await supabase.from('pedido_detalles').update({ notas }).eq('id', itemId);
+    if (error) return false;
+
+    set(s => ({
+      pedidos: s.pedidos.map(p =>
+        p.id === pedidoId
+          ? { ...p, items: p.items.map(i => i.id === itemId ? { ...i, notas } : i) }
+          : p
+      ),
+    }));
+    return true;
+  },
+
   procesarPago: async (pagoData) => {
     const { data: pago, error } = await supabase.from('pagos').insert({
       pedido_id: pagoData.pedidoId,
@@ -558,16 +599,35 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addMovimientoCaja: async (m) => {
-    const { error } = await supabase.from('movimientos_caja').insert({
+    const { data, error } = await supabase.from('movimientos_caja').insert({
       tipo: m.tipo,
       monto: m.monto,
       descripcion: m.descripcion,
       categoria: m.categoria,
       usuario_id: get().currentUser?.id
-    });
+    }).select().single();
     
     if (error) {
       console.error('Error al registrar movimiento de caja:', error);
+      toast.error('Error al registrar gasto');
+      return;
+    }
+
+    if (data) {
+      const nuevoMov = {
+        id: data.id,
+        tipo: data.tipo,
+        monto: Number(data.monto),
+        descripcion: data.descripcion,
+        categoria: data.categoria,
+        fecha: data.fecha,
+        userId: data.usuario_id
+      };
+      
+      set(s => ({
+        movimientosCaja: [nuevoMov, ...s.movimientosCaja]
+      }));
+      return nuevoMov;
     }
   },
 }));

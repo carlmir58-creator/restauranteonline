@@ -99,7 +99,12 @@ const Cocina = () => {
                 <div className="mb-3">
                   <p className="text-base font-semibold text-foreground">{item.producto?.nombre}</p>
                   <p className="text-2xl font-bold text-primary">×{item.cantidad}</p>
-                  {item.notas && <p className="text-xs text-amber-400 mt-1 italic">📝 {item.notas}</p>}
+                  {item.notas && <p className="text-xs text-amber-500 mt-1 italic bg-amber-500/10 p-1 rounded">📝 {item.notas}</p>}
+                  {item.pedido.observaciones && (
+                    <div className="mt-2 text-[10px] bg-blue-500/10 text-blue-400 p-1.5 rounded border border-blue-500/20">
+                      <span className="font-bold uppercase">Nota del Pedido:</span> {item.pedido.observaciones}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2">

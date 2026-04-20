@@ -84,6 +84,18 @@ const Layout = ({ children }: { children: ReactNode }) => {
             <LogOut className="w-4 h-4" />
             Cerrar Sesión
           </button>
+          
+          <div className="mt-4 px-3 py-2 border-t border-sidebar-border/50">
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Copyright © 2026 Carlos Miranda
+            </p>
+            <p className="text-[10px] text-muted-foreground/70">
+              carlmir58@gmail.com
+            </p>
+            <p className="text-[10px] text-muted-foreground/70">
+              Todos los derechos reservados.
+            </p>
+          </div>
         </div>
       </aside>
 

@@ -78,6 +78,11 @@ const AppRoutes = () => {
         >
           Cerrar Sesión
         </button>
+
+        <div className="mt-12 text-xs text-muted-foreground">
+          <p>© 2026 Carlos Miranda • carlmir58@gmail.com</p>
+          <p className="mt-1">Todos los derechos reservados.</p>
+        </div>
       </div>
     );
   }

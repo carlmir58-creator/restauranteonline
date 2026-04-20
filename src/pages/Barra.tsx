@@ -101,6 +101,12 @@ const Barra = () => {
                 </div>
                 <p className="text-base font-semibold text-foreground">{item.producto?.nombre}</p>
                 <p className="text-2xl font-bold text-purple-400">×{item.cantidad}</p>
+                {item.notas && <p className="text-xs text-purple-400/80 mt-1 italic bg-purple-500/10 p-1 rounded">📝 {item.notas}</p>}
+                {item.pedido.observaciones && (
+                  <div className="mt-2 text-[10px] bg-blue-500/10 text-blue-400 p-1.5 rounded border border-blue-500/20">
+                    <span className="font-bold uppercase">Nota del Pedido:</span> {item.pedido.observaciones}
+                  </div>
+                )}
                 <div className="mt-3 flex gap-2">
                   {item.estado === 'pendiente' && (
                     <button onClick={() => handleIniciar(item.pedidoId, item.id)} className="pos-btn-secondary flex-1 text-xs">Preparar</button>

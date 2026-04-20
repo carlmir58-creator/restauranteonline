@@ -25,6 +25,8 @@ const NuevoPedido = ({ mesaId, onClose }: Props) => {
   const [cliente, setCliente] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [lastSentIds, setLastSentIds] = useState<string[]>([]); // IDs recién enviados
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [tempNote, setTempNote] = useState('');
 
   const [cart, setCart] = useState<{ productoId: string; cantidad: number; notas: string }[]>([]);
 
@@ -238,14 +240,23 @@ const NuevoPedido = ({ mesaId, onClose }: Props) => {
             <div className="flex-1 overflow-auto p-3 space-y-2">
 
               {/* Client input (solo pedido nuevo) */}
+              {/* Client & Observations (solo pedido nuevo) */}
               {!pedidoActivo && (
-                <input
-                  type="text"
-                  placeholder="Cliente (opcional)"
-                  value={cliente}
-                  onChange={e => setCliente(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground mb-2"
-                />
+                <div className="space-y-2 mb-3 bg-muted/20 p-2 rounded-lg border border-border/50">
+                  <input
+                    type="text"
+                    placeholder="Cliente (opcional)"
+                    value={cliente}
+                    onChange={e => setCliente(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground"
+                  />
+                  <textarea
+                    placeholder="Observaciones generales (Ej: Llevar todo al tiempo, sin cubiertos...)"
+                    value={notas}
+                    onChange={e => setNotas(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-background border border-border text-xs text-foreground placeholder:text-muted-foreground h-16 resize-none focus:ring-1 ring-primary/30"
+                  />
+                </div>
               )}
 
               {/* Existing items */}
@@ -265,6 +276,57 @@ const NuevoPedido = ({ mesaId, onClose }: Props) => {
                         {isNew && <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />}
                         {prod?.nombre}
                       </p>
+                      {editingNoteId === item.id ? (
+                        <div className="flex items-center gap-1 mt-1 animate-in fade-in slide-in-from-top-1">
+                          <input 
+                            autoFocus
+                            type="text" 
+                            className="text-[10px] bg-background border border-primary/50 rounded px-1.5 py-0.5 flex-1 focus:outline-none"
+                            value={tempNote}
+                            onChange={e => setTempNote(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                useStore.getState().actualizarItemNotas(pedidoActivo.id, item.id, tempNote);
+                                setEditingNoteId(null);
+                              }
+                              if (e.key === 'Escape') setEditingNoteId(null);
+                            }}
+                          />
+                          <button 
+                            onClick={() => {
+                              useStore.getState().actualizarItemNotas(pedidoActivo.id, item.id, tempNote);
+                              setEditingNoteId(null);
+                            }}
+                            className="bg-primary/20 text-primary p-0.5 rounded"
+                          >
+                            <Send className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          {item.notas ? (
+                            <p 
+                              onClick={() => {
+                                setEditingNoteId(item.id);
+                                setTempNote(item.notas);
+                              }}
+                              className="text-[10px] text-amber-500 italic bg-amber-500/10 px-1 rounded cursor-pointer hover:bg-amber-500/20 transition-colors"
+                            >
+                              📝 {item.notas}
+                            </p>
+                          ) : canEdit && (
+                            <button 
+                              onClick={() => {
+                                setEditingNoteId(item.id);
+                                setTempNote('');
+                              }}
+                              className="text-[10px] text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+                            >
+                              + agregar nota
+                            </button>
+                          )}
+                        </>
+                      )}
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`text-[10px] px-1.5 py-0.5 rounded ${estadoColors[item.estado]}`}>
                           {estadoLabels[item.estado]}
@@ -300,26 +362,38 @@ const NuevoPedido = ({ mesaId, onClose }: Props) => {
                 <>
                   {pedidoActivo && <div className="border-t border-border my-2" />}
                   <p className="text-xs text-muted-foreground font-medium">Nuevos items</p>
-                  {cart.map(item => {
+                  {cart.map((item, index) => {
                     const prod = productos.find(p => p.id === item.productoId);
                     return (
-                      <div key={item.productoId} className="flex items-center gap-2 py-2 px-2 rounded-lg bg-primary/5 border border-primary/20">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{prod?.nombre}</p>
-                          <span className="text-xs text-muted-foreground">${((prod?.precio || 0) * item.cantidad).toFixed(2)}</span>
+                      <div key={`${item.productoId}-${index}`} className="flex flex-col gap-2 py-2 px-2 rounded-lg bg-primary/5 border border-primary/20">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{prod?.nombre}</p>
+                            <span className="text-xs text-muted-foreground">${((prod?.precio || 0) * item.cantidad).toFixed(2)}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => updateCartQty(item.productoId, -1)} className="p-1 rounded bg-muted hover:bg-accent">
+                              <Minus className="w-3 h-3 text-muted-foreground" />
+                            </button>
+                            <span className="text-sm font-medium text-foreground w-6 text-center">{item.cantidad}</span>
+                            <button onClick={() => updateCartQty(item.productoId, 1)} className="p-1 rounded bg-muted hover:bg-accent">
+                              <Plus className="w-3 h-3 text-muted-foreground" />
+                            </button>
+                            <button onClick={() => removeFromCart(item.productoId)} className="p-1 rounded hover:bg-destructive/20 ml-1">
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => updateCartQty(item.productoId, -1)} className="p-1 rounded bg-muted hover:bg-accent">
-                            <Minus className="w-3 h-3 text-muted-foreground" />
-                          </button>
-                          <span className="text-sm font-medium text-foreground w-6 text-center">{item.cantidad}</span>
-                          <button onClick={() => updateCartQty(item.productoId, 1)} className="p-1 rounded bg-muted hover:bg-accent">
-                            <Plus className="w-3 h-3 text-muted-foreground" />
-                          </button>
-                          <button onClick={() => removeFromCart(item.productoId)} className="p-1 rounded hover:bg-destructive/20 ml-1">
-                            <Trash2 className="w-3 h-3 text-destructive" />
-                          </button>
-                        </div>
+                        <input
+                          type="text"
+                          placeholder="Notas o modificaciones..."
+                          value={item.notas}
+                          onChange={e => {
+                            const newNotas = e.target.value;
+                            setCart(c => c.map((i, idx) => idx === index ? { ...i, notas: newNotas } : i));
+                          }}
+                          className="text-xs bg-card/50 border-border/50 border rounded px-2 py-1 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
+                        />
                       </div>
                     );
                   })}

@@ -238,3 +238,58 @@ export function printReceipt(params: PrintReceiptParams, onDone?: () => void): v
 export function printComanda(params: PrintComandaParams, onDone?: () => void): void {
   printHTML(buildComandaHTML(params), onDone);
 }
+
+// ── Comprobante de Egreso (Gastos) ──────────────────────────────────────────
+export function buildEgresoHTML(mov: {
+  id: string,
+  monto: number,
+  descripcion: string,
+  categoria: string,
+  fecha: string,
+  usuarioNombre?: string
+}): string {
+  const fechaStr = new Date(mov.fecha).toLocaleDateString();
+  const horaStr  = new Date(mov.fecha).toLocaleTimeString();
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>Comprobante de Egreso</title>
+<style>
+  body { font-family: 'Courier New', Courier, monospace; font-size: 13px; width: 80mm; padding: 4mm; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .large { font-size: 16px; }
+  .border { border: 1px solid #000; padding: 2mm; margin: 2mm 0; }
+  .divider { border-top: 1px dashed #000; margin: 3mm 0; }
+</style>
+</head>
+<body>
+  <div class="center bold large">COMPROBANTE DE EGRESO</div>
+  <div class="center">${RESTAURANTE}</div>
+  <div class="divider"></div>
+  <p><span class="bold">N°:</span> ${mov.id.slice(0, 8).toUpperCase()}</p>
+  <p><span class="bold">Fecha:</span> ${fechaStr} ${horaStr}</p>
+  <p><span class="bold">Categoría:</span> ${mov.categoria.toUpperCase()}</p>
+  <div class="border">
+    <p class="bold">CONCEPTO:</p>
+    <p>${mov.descripcion}</p>
+  </div>
+  <p class="large bold center" style="background:#000; color:#fff; padding:1mm;">
+    VALOR: $${mov.monto.toFixed(2)}
+  </p>
+  <div class="divider"></div>
+  <p class="bold">Atentamente:</p>
+  <p>${mov.usuarioNombre || 'Administración'}</p>
+  <br/><br/>
+  <div style="border-top: 1px solid #000; text-align: center; font-size: 10px; margin-top: 5mm;">
+    Firma / Sello Recibido
+  </div>
+</body>
+</html>`;
+}
+
+export function printEgreso(mov: any, onDone?: () => void): void {
+  printHTML(buildEgresoHTML(mov), onDone);
+}
