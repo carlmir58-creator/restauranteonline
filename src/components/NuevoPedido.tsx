@@ -11,8 +11,8 @@ interface Props {
 
 const NuevoPedido = ({ mesaId, onClose }: Props) => {
   const {
-    mesas, productos, categorias, pedidos, currentUser,
-    crearPedido, agregarItem, eliminarItem, actualizarItemCantidad
+    mesas, productos, categorias, pedidos, currentUser, configuraciones,
+    crearPedido, agregarItem, eliminarItem, actualizarItemCantidad, actualizarItemEstado
   } = useStore();
 
   const mesa = mesas.find(m => m.id === mesaId)!;
@@ -93,7 +93,7 @@ const NuevoPedido = ({ mesaId, onClose }: Props) => {
           productos,
           meseroNombre: currentUser?.nombre,
           nuevosIds: newIds,
-        });
+        }, configuraciones.impresion_separada_barra);
       }
 
       setCart([]);
@@ -114,7 +114,7 @@ const NuevoPedido = ({ mesaId, onClose }: Props) => {
       mesa,
       productos,
       meseroNombre: currentUser?.nombre,
-    });
+    }, configuraciones.impresion_separada_barra);
     toast.success('Reimprimiendo comanda…');
   };
 
@@ -332,28 +332,39 @@ const NuevoPedido = ({ mesaId, onClose }: Props) => {
                           {estadoLabels[item.estado]}
                         </span>
                         <span className="text-xs text-muted-foreground">${(item.precio * item.cantidad).toFixed(2)}</span>
-                      </div>
-                    </div>
-                    {canEdit ? (
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => handleModificarCantidad(item.id, item.cantidad - 1)} className="p-1 rounded bg-muted hover:bg-accent">
-                          <Minus className="w-3 h-3 text-muted-foreground" />
-                        </button>
-                        <span className="text-sm font-medium text-foreground w-6 text-center">{item.cantidad}</span>
-                        <button onClick={() => handleModificarCantidad(item.id, item.cantidad + 1)} className="p-1 rounded bg-muted hover:bg-accent">
-                          <Plus className="w-3 h-3 text-muted-foreground" />
-                        </button>
-                        <button onClick={() => handleEliminarItem(item.id)} className="p-1 rounded hover:bg-destructive/20 ml-1">
-                          <Trash2 className="w-3 h-3 text-destructive" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <AlertCircle className="w-3 h-3" />
-                        ×{item.cantidad}
-                      </div>
-                    )}
-                  </div>
+                       </div>
+                     </div>
+ 
+                     {canEdit ? (
+                       <div className="flex items-center gap-1">
+                         <button onClick={() => handleModificarCantidad(item.id, item.cantidad - 1)} className="p-1 rounded bg-muted hover:bg-accent">
+                           <Minus className="w-3 h-3 text-muted-foreground" />
+                         </button>
+                         <span className="text-sm font-medium text-foreground w-6 text-center">{item.cantidad}</span>
+                         <button onClick={() => handleModificarCantidad(item.id, item.cantidad + 1)} className="p-1 rounded bg-muted hover:bg-accent">
+                           <Plus className="w-3 h-3 text-muted-foreground" />
+                         </button>
+                         <button onClick={() => handleEliminarItem(item.id)} className="p-1 rounded hover:bg-destructive/20 ml-1">
+                           <Trash2 className="w-3 h-3 text-destructive" />
+                         </button>
+                       </div>
+                     ) : (
+                       <div className="flex items-center gap-3">
+                         {!configuraciones.produccion_digital_habilitada && (item.estado === 'pendiente' || item.estado === 'en_preparacion') && (
+                           <button
+                             onClick={() => actualizarItemEstado(pedidoActivo.id, item.id, 'listo')}
+                             className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded hover:bg-emerald-500/20 transition-all font-bold uppercase"
+                           >
+                             Listo
+                           </button>
+                         )}
+                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                           <AlertCircle className="w-3 h-3" />
+                           ×{item.cantidad}
+                         </div>
+                       </div>
+                     )}
+                   </div>
                 );
               })}
 

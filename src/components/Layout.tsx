@@ -3,7 +3,7 @@ import { useStore } from '@/store/useStore';
 import { Role } from '@/types';
 import {
   LayoutDashboard, UtensilsCrossed, ChefHat, Beer,
-  CreditCard, Package, BarChart3, Users, LogOut, Coffee
+  CreditCard, Package, BarChart3, Users, LogOut, Coffee, Settings
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
   { label: 'Productos', path: '/productos', icon: <Package className="w-5 h-5" />, roles: ['admin'] },
   { label: 'Reportes', path: '/reportes', icon: <BarChart3 className="w-5 h-5" />, roles: ['admin'] },
   { label: 'Usuarios', path: '/usuarios', icon: <Users className="w-5 h-5" />, roles: ['admin'] },
+  { label: 'Configuración', path: '/configuracion', icon: <Settings className="w-5 h-5" />, roles: ['admin'] },
 ];
 
 const Layout = ({ children }: { children: ReactNode }) => {

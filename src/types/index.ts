@@ -79,3 +79,9 @@ export interface MovimientoCaja {
   userId?: string;
   categoria?: string;
 }
+export interface Configuracion {
+  key: string;
+  value: any;
+  descripcion?: string;
+  updated_at?: string;
+}

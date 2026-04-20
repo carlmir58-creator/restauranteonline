@@ -16,6 +16,7 @@ import Caja from "@/pages/Caja";
 import Productos from "@/pages/Productos";
 import Reportes from "@/pages/Reportes";
 import Usuarios from "@/pages/Usuarios";
+import Configuracion from "@/pages/Configuracion";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -99,8 +100,9 @@ const AppRoutes = () => {
         {['admin', 'barra'].includes(role) && <Route path="/barra" element={<Barra />} />}
         {['admin', 'cajero'].includes(role) && <Route path="/caja" element={<Caja />} />}
         {role === 'admin' && <Route path="/productos" element={<Productos />} />}
-        {role === 'admin' && <Route path="/reportes" element={<Reportes />} />}
-        {role === 'admin' && <Route path="/usuarios" element={<Usuarios />} />}
+        { role === 'admin' && <Route path="/reportes" element={<Reportes />} />}
+        { role === 'admin' && <Route path="/usuarios" element={<Usuarios />} />}
+        { role === 'admin' && <Route path="/configuracion" element={<Configuracion />} />}
         <Route path="*" element={<Navigate to={defaultRoute} replace />} />
       </Routes>
     </Layout>

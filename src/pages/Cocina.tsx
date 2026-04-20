@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { ChefHat, Clock, PlayCircle, CheckCircle, History } from 'lucide-react';
+import { ChefHat, Clock, PlayCircle, CheckCircle, History, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Tab = 'pendientes' | 'completados';
 
 const Cocina = () => {
-  const { pedidos, mesas, productos, actualizarItemEstado } = useStore();
+  const { pedidos, mesas, productos, actualizarItemEstado, configuraciones } = useStore();
   const [tab, setTab] = useState<Tab>('pendientes');
 
   const hoy = new Date().toDateString();
@@ -75,6 +75,16 @@ const Cocina = () => {
           </button>
         </div>
       </div>
+
+      {!configuraciones.produccion_digital_habilitada && (
+        <div className="pos-card bg-amber-500/10 border-amber-500/20 text-amber-500 p-4 mb-6 flex items-center gap-3">
+          <Monitor className="w-6 h-6 animate-pulse" />
+          <div>
+            <p className="font-bold">Pantallas de producción deshabilitadas</p>
+            <p className="text-xs">Los meseros gestionarán los estados directamente. Esta pantalla funcionará solo como referencia.</p>
+          </div>
+        </div>
+      )}
 
       {tab === 'pendientes' && (
         pendientes.length === 0 ? (

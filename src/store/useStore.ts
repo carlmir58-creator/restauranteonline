@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { 
   User, Mesa, Producto, Categoria, Pedido, PedidoDetalle, 
-  Pago, MovimientoCaja, ItemEstado, MesaEstado 
+  Pago, MovimientoCaja, ItemEstado, MesaEstado, Configuracion 
 } from '@/types';
 
 interface AppState {
@@ -23,6 +23,7 @@ interface AppState {
   pedidos: Pedido[];
   pagos: Pago[];
   movimientosCaja: MovimientoCaja[];
+  configuraciones: Record<string, any>;
   isLoading: boolean;
 
   // Actions
@@ -49,6 +50,7 @@ interface AppState {
   addUser: (u: Omit<User, 'id'>) => Promise<void>;
   updateUser: (id: string, changes: Partial<Pick<User, 'rol' | 'activo'>>) => Promise<void>;
   addMovimientoCaja: (m: Omit<MovimientoCaja, 'id' | 'fecha' | 'userId'>) => Promise<void>;
+  updateConfiguracion: (key: string, value: any) => Promise<void>;
   subscribeToChanges: () => () => void;
 }
 
@@ -61,6 +63,10 @@ export const useStore = create<AppState>((set, get) => ({
   pedidos: [],
   pagos: [],
   movimientosCaja: [],
+  configuraciones: {
+    impresion_separada_barra: false,
+    produccion_digital_habilitada: true,
+  },
   isLoading: false,
 
   subscribeToChanges: () => {
@@ -164,6 +170,12 @@ export const useStore = create<AppState>((set, get) => ({
           set(s => ({ movimientosCaja: [newMov, ...s.movimientosCaja] }));
         }
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'configuraciones' }, (payload) => {
+        console.log('%c[Realtime] Configuración actualizada:', 'color: #3ecf8e', payload);
+        set(s => ({
+          configuraciones: { ...s.configuraciones, [payload.new.key]: payload.new.value }
+        }));
+      })
       .subscribe((status) => {
         console.log('%c[Supabase Realtime] Estado:', 'color: #3ecf8e; font-weight: bold', status);
       });
@@ -183,14 +195,16 @@ export const useStore = create<AppState>((set, get) => ({
         { data: productos },
         { data: perfiles },
         { data: pagos },
-        { data: movimientos_caja }
+        { data: movimientos_caja },
+        { data: configuraciones }
       ] = await Promise.all([
         supabase.from('mesas').select('*').order('numero'),
         supabase.from('categorias').select('*').order('orden_visual'),
         supabase.from('productos').select('*').order('nombre'),
         supabase.from('perfiles').select('*'),
         supabase.from('pagos').select('*').order('fecha', { ascending: false }),
-        supabase.from('movimientos_caja').select('*').order('fecha', { ascending: false })
+        supabase.from('movimientos_caja').select('*').order('fecha', { ascending: false }),
+        supabase.from('configuraciones').select('*')
       ]);
 
       set({
@@ -240,7 +254,11 @@ export const useStore = create<AppState>((set, get) => ({
           categoria: m.categoria,
           fecha: m.fecha,
           userId: m.usuario_id
-        }))
+        })),
+        configuraciones: (configuraciones || []).reduce((acc, c) => ({ ...acc, [c.key]: c.value }), {
+          impresion_separada_barra: false,
+          produccion_digital_habilitada: true,
+        })
       });
 
       // Fetch active orders OR orders from today
@@ -629,5 +647,14 @@ export const useStore = create<AppState>((set, get) => ({
       }));
       return nuevoMov;
     }
+  },
+
+  updateConfiguracion: async (key, value) => {
+    const { error } = await supabase.from('configuraciones').update({ value, updated_at: new Date().toISOString() }).eq('key', key);
+    if (error) {
+      toast.error('Error al actualizar configuración');
+      return;
+    }
+    set(s => ({ configuraciones: { ...s.configuraciones, [key]: value } }));
   },
 }));
