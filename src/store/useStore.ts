@@ -562,8 +562,8 @@ export const useStore = create<AppState>((set, get) => ({
       nombre: p.nombre,
       precio: p.precio,
       categoria_id: p.categoriaId,
-      area: p.area,
-      activo: p.activo
+      activo: p.activo,
+      imagen_url: p.imagenUrl
     });
     if (!error) await get().fetchInitialData();
   },
@@ -573,9 +573,9 @@ export const useStore = create<AppState>((set, get) => ({
       nombre: data.nombre,
       precio: data.precio,
       categoria_id: data.categoriaId,
-      area: data.area,
       activo: data.activo,
-      disponible: data.disponible
+      disponible: data.disponible,
+      imagen_url: data.imagenUrl
     }).eq('id', id);
     if (!error) await get().fetchInitialData();
   },
