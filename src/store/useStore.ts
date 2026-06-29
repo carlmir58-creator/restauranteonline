@@ -3,7 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { 
   User, Mesa, Producto, Categoria, Pedido, PedidoDetalle, 
-  Pago, MovimientoCaja, ItemEstado, MesaEstado, Configuracion 
+  Pago, MovimientoCaja, ItemEstado, MesaEstado, Configuracion,
+  Restaurante
 } from '@/types';
 
 interface AppState {
@@ -16,6 +17,8 @@ interface AppState {
   setSession: (session: any) => Promise<void>;
 
   // Data
+  restaurantes: Restaurante[];
+  currentRestaurant: Restaurante | null;
   users: User[];
   mesas: Mesa[];
   productos: Producto[];
@@ -28,6 +31,9 @@ interface AppState {
 
   // Actions
   fetchInitialData: () => Promise<void>;
+  fetchRestaurantes: () => Promise<void>;
+  addRestaurante: (r: Omit<Restaurante, 'id' | 'created_at' | 'slug'> & { slug?: string }) => Promise<string | null>;
+  updateRestaurante: (id: string, data: Partial<Restaurante>) => Promise<void>;
   
   // Mesa actions
   updateMesaEstado: (mesaId: string, estado: MesaEstado) => Promise<void>;
@@ -56,6 +62,8 @@ interface AppState {
 
 export const useStore = create<AppState>((set, get) => ({
   currentUser: null,
+  restaurantes: [],
+  currentRestaurant: null,
   users: [],
   mesas: [],
   productos: [],
@@ -354,14 +362,28 @@ export const useStore = create<AppState>((set, get) => ({
         .single();
       
       if (profile) {
-        set({
-          currentUser: {
-            id: profile.id,
-            nombre: profile.nombre,
-            rol: profile.rol,
-            activo: profile.activo
+        const user: User = {
+          id: profile.id,
+          nombre: profile.nombre,
+          rol: profile.rol,
+          activo: profile.activo,
+          restauranteId: profile.restaurante_id,
+        };
+        set({ currentUser: user });
+
+        // If super_admin, fetch restaurants
+        if (profile.rol === 'super_admin') {
+          get().fetchRestaurantes();
+        } else if (profile.restaurante_id) {
+          const { data: restaurant } = await supabase
+            .from('restaurantes')
+            .select('*')
+            .eq('id', profile.restaurante_id)
+            .single();
+          if (restaurant) {
+            set({ currentRestaurant: restaurant });
           }
-        });
+        }
       }
     } else {
       set({ currentUser: null });
@@ -656,5 +678,61 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
     set(s => ({ configuraciones: { ...s.configuraciones, [key]: value } }));
+  },
+
+  // Restaurant actions
+  fetchRestaurantes: async () => {
+    const { data } = await supabase
+      .from('restaurantes')
+      .select('*')
+      .order('nombre');
+    if (data) {
+      set({ restaurantes: data });
+    }
+  },
+
+  addRestaurante: async (r) => {
+    const slug = r.slug || r.nombre.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const { data, error } = await supabase
+      .from('restaurantes')
+      .insert({
+        nombre: r.nombre,
+        slug,
+        direccion: r.direccion,
+        telefono: r.telefono,
+        logo_url: r.logo_url,
+        activo: r.activo ?? true,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast.error('Error al crear restaurante: ' + error.message);
+      return null;
+    }
+
+    await get().fetchRestaurantes();
+    return data?.id ?? null;
+  },
+
+  updateRestaurante: async (id, data) => {
+    const { error } = await supabase
+      .from('restaurantes')
+      .update(data)
+      .eq('id', id);
+
+    if (error) {
+      toast.error('Error al actualizar restaurante: ' + error.message);
+      return;
+    }
+
+    await get().fetchRestaurantes();
+
+    // Also update currentRestaurant if it's the same
+    if (get().currentRestaurant?.id === id) {
+      set(s => ({
+        currentRestaurant: s.currentRestaurant ? { ...s.currentRestaurant, ...data } : null,
+      }));
+    }
   },
 }));

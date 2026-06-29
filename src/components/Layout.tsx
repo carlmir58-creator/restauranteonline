@@ -3,7 +3,7 @@ import { useStore } from '@/store/useStore';
 import { Role } from '@/types';
 import {
   LayoutDashboard, UtensilsCrossed, ChefHat, Beer,
-  CreditCard, Package, BarChart3, Users, LogOut, Coffee, Settings
+  CreditCard, Package, BarChart3, Users, LogOut, Coffee, Settings, Building2
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -15,6 +15,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { label: 'Restaurantes', path: '/super-admin', icon: <Building2 className="w-5 h-5" />, roles: ['super_admin'] },
   { label: 'Dashboard', path: '/', icon: <LayoutDashboard className="w-5 h-5" />, roles: ['admin'] },
   { label: 'Mesas', path: '/mesas', icon: <Coffee className="w-5 h-5" />, roles: ['admin', 'mesero'] },
   { label: 'Cocina', path: '/cocina', icon: <ChefHat className="w-5 h-5" />, roles: ['admin', 'cocina'] },
@@ -27,7 +28,7 @@ const navItems: NavItem[] = [
 ];
 
 const Layout = ({ children }: { children: ReactNode }) => {
-  const { currentUser, logout } = useStore();
+  const { currentUser, currentRestaurant, logout } = useStore();
   const location = useLocation();
 
   const filteredNav = navItems.filter(item =>
@@ -35,6 +36,7 @@ const Layout = ({ children }: { children: ReactNode }) => {
   );
 
   const roleLabels: Record<string, string> = {
+    super_admin: 'Super Administrador',
     admin: 'Administrador',
     mesero: 'Mesero',
     cajero: 'Cajero',
@@ -47,8 +49,14 @@ const Layout = ({ children }: { children: ReactNode }) => {
       {/* Sidebar */}
       <aside className="w-[220px] bg-[hsl(var(--sidebar-background))] border-r border-sidebar-border flex flex-col shrink-0 max-md:hidden">
         <div className="p-4 flex items-center gap-2 border-b border-sidebar-border">
-          <UtensilsCrossed className="w-6 h-6 text-primary" />
-          <span className="font-bold text-foreground text-lg">RestoPOS</span>
+          {currentRestaurant?.logo_url ? (
+            <img src={currentRestaurant.logo_url} alt={currentRestaurant.nombre} className="w-6 h-6 rounded object-cover" />
+          ) : (
+            <UtensilsCrossed className="w-6 h-6 text-primary" />
+          )}
+          <span className="font-bold text-foreground text-lg truncate">
+            {currentRestaurant?.nombre || 'RestoPOS'}
+          </span>
         </div>
 
         <nav className="flex-1 p-2 space-y-1">

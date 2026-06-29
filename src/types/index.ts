@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'mesero' | 'cajero' | 'cocina' | 'barra';
+export type Role = 'super_admin' | 'admin' | 'mesero' | 'cajero' | 'cocina' | 'barra';
 export type MesaEstado = 'disponible' | 'ocupada' | 'en_cobro' | 'cerrada' | 'reservada' | 'mantenimiento';
 export type ItemEstado = 'pendiente' | 'en_preparacion' | 'listo' | 'entregado' | 'cobrado' | 'cancelado';
 export type AreaProducto = 'cocina' | 'barra';
@@ -9,6 +9,18 @@ export interface User {
   nombre: string;
   rol: Role;
   activo: boolean;
+  restauranteId?: string;
+}
+
+export interface Restaurante {
+  id: string;
+  nombre: string;
+  slug: string;
+  direccion?: string;
+  telefono?: string;
+  logo_url?: string;
+  activo: boolean;
+  created_at?: string;
 }
 
 export interface Mesa {

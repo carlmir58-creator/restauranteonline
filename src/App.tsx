@@ -8,6 +8,7 @@ import { useStore } from "@/store/useStore";
 import { supabase } from "@/lib/supabase";
 import Layout from "@/components/Layout";
 import Login from "@/pages/Login";
+import SuperAdmin from "@/pages/SuperAdmin";
 import Dashboard from "@/pages/Dashboard";
 import Mesas from "@/pages/Mesas";
 import Cocina from "@/pages/Cocina";
@@ -22,6 +23,7 @@ import NotFound from "./pages/NotFound.tsx";
 const queryClient = new QueryClient();
 
 const defaultRoutes: Record<string, string> = {
+  super_admin: '/super-admin',
   admin: '/',
   mesero: '/mesas',
   cajero: '/caja',
@@ -94,6 +96,7 @@ const AppRoutes = () => {
   return (
     <Layout>
       <Routes>
+        {role === 'super_admin' && <Route path="/super-admin" element={<SuperAdmin />} />}
         {role === 'admin' && <Route path="/" element={<Dashboard />} />}
         {['admin', 'mesero'].includes(role) && <Route path="/mesas" element={<Mesas />} />}
         {['admin', 'cocina'].includes(role) && <Route path="/cocina" element={<Cocina />} />}
