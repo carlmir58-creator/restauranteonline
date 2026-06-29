@@ -446,15 +446,26 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   signOut: async () => {
-    // Limpiar estado INMEDIATAMENTE para reflejar el cambio en UI
-    set({ currentUser: null, session: null, currentRestaurant: null });
+    // 1. Limpiar estado inmediatamente para que la UI refleje el cambio
+    set({ currentUser: null, session: null, currentRestaurant: null, isLoading: false });
+    // 2. Forzar limpieza de localStorage de Supabase (por si la API falla)
     try {
-      await supabase.auth.signOut();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const projectRef = supabaseUrl?.split('.')[0]?.split('//')[1];
+      if (projectRef) {
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith(`sb-${projectRef}`)) localStorage.removeItem(key);
+        });
+      }
+    } catch {}
+    // 3. Intentar signOut en Supabase (scope: 'local' para no depender de red)
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
     } catch {
-      // Ignorar errores de red al cerrar sesión
+      // Ignorar errores
     }
-    // Asegurar limpieza incluso si onAuthStateChange no se dispara
-    set({ currentUser: null, session: null, currentRestaurant: null });
+    // 4. Re-asegurar estado limpio
+    set({ currentUser: null, session: null, currentRestaurant: null, isLoading: false });
   },
 
   setSession: async (session) => {
