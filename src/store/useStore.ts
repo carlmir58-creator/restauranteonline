@@ -57,6 +57,8 @@ interface AppState {
   updateUser: (id: string, changes: Partial<Pick<User, 'rol' | 'activo'>>) => Promise<void>;
   addMovimientoCaja: (m: Omit<MovimientoCaja, 'id' | 'fecha' | 'userId'>) => Promise<void>;
   updateConfiguracion: (key: string, value: any) => Promise<void>;
+  createRestaurantAdmin: (email: string, password: string, nombre: string, restauranteId: string) => Promise<{ error: any }>;
+  createStaffUser: (email: string, password: string, nombre: string, rol: Role, restauranteId?: string) => Promise<{ error: any }>;
   subscribeToChanges: () => () => void;
 }
 
@@ -254,7 +256,8 @@ export const useStore = create<AppState>((set, get) => ({
           id: u.id,
           nombre: u.nombre,
           rol: u.rol,
-          activo: u.activo
+          activo: u.activo,
+          restauranteId: u.restaurante_id,
         })),
         pagos: (pagos || []).map(p => ({
           id: p.id,
@@ -357,6 +360,84 @@ export const useStore = create<AppState>((set, get) => ({
       }
     });
     if (error) return { error };
+    return { error: null };
+  },
+
+  createRestaurantAdmin: async (email, password, nombre, restauranteId) => {
+    const { data, error } = await supabase.auth.signUp({ 
+      email, password,
+      options: {
+        data: { full_name: nombre },
+        emailRedirectTo: window.location.origin
+      }
+    });
+    if (error || !data.user) return { error: error || { message: 'Error al crear usuario' } };
+
+    // Esperar a que el trigger cree el perfil
+    let profile = null;
+    for (let i = 0; i < 10; i++) {
+      const { data: p } = await supabase
+        .from('perfiles')
+        .select('id')
+        .eq('id', data.user.id)
+        .single();
+      if (p) { profile = p; break; }
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    if (!profile) {
+      // Si el trigger no creó el perfil, crearlo manualmente
+      const { error: insertError } = await supabase.from('perfiles').insert({
+        id: data.user.id,
+        nombre,
+        rol: 'admin',
+        activo: true,
+        restaurante_id: restauranteId,
+      });
+      if (insertError) return { error: insertError };
+    } else {
+      // Actualizar el perfil creado por el trigger
+      const { error: updateError } = await supabase
+        .from('perfiles')
+        .update({ rol: 'admin', restaurante_id: restauranteId, nombre })
+        .eq('id', data.user.id);
+      if (updateError) return { error: updateError };
+    }
+
+    await get().fetchRestaurantes();
+    return { error: null };
+  },
+
+  createStaffUser: async (email, password, nombre, rol, restauranteId) => {
+    const restId = restauranteId || get().currentUser?.restauranteId;
+    if (!restId) return { error: { message: 'No hay restaurante asignado' } };
+
+    const { data, error } = await supabase.auth.signUp({
+      email, password,
+      options: {
+        data: { full_name: nombre },
+        emailRedirectTo: window.location.origin
+      }
+    });
+    if (error || !data.user) return { error: error || { message: 'Error al crear usuario' } };
+
+    const { error: updateError } = await supabase
+      .from('perfiles')
+      .update({ rol, restaurante_id: restId, nombre })
+      .eq('id', data.user.id);
+
+    if (updateError) {
+      const { error: insertError } = await supabase.from('perfiles').insert({
+        id: data.user.id,
+        nombre,
+        rol,
+        activo: true,
+        restaurante_id: restId,
+      });
+      if (insertError) return { error: insertError };
+    }
+
+    await get().fetchInitialData();
     return { error: null };
   },
 

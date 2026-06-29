@@ -23,7 +23,7 @@ const navItems: NavItem[] = [
   { label: 'Caja', path: '/caja', icon: <CreditCard className="w-5 h-5" />, roles: ['admin', 'cajero'] },
   { label: 'Productos', path: '/productos', icon: <Package className="w-5 h-5" />, roles: ['admin'] },
   { label: 'Reportes', path: '/reportes', icon: <BarChart3 className="w-5 h-5" />, roles: ['admin'] },
-  { label: 'Usuarios', path: '/usuarios', icon: <Users className="w-5 h-5" />, roles: ['admin'] },
+  { label: 'Usuarios', path: '/usuarios', icon: <Users className="w-5 h-5" />, roles: ['admin', 'super_admin'] },
   { label: 'Configuración', path: '/configuracion', icon: <Settings className="w-5 h-5" />, roles: ['admin'] },
 ];
 

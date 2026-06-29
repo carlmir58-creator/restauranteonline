@@ -111,7 +111,7 @@ const AppRoutes = () => {
         {['admin', 'cajero'].includes(role) && <Route path="/caja" element={<Caja />} />}
         {role === 'admin' && <Route path="/productos" element={<Productos />} />}
         { role === 'admin' && <Route path="/reportes" element={<Reportes />} />}
-        { role === 'admin' && <Route path="/usuarios" element={<Usuarios />} />}
+        { ['admin', 'super_admin'].includes(role) && <Route path="/usuarios" element={<Usuarios />} />}
         { role === 'admin' && <Route path="/configuracion" element={<Configuracion />} />}
         <Route path="*" element={<Navigate to={defaultRoute} replace />} />
       </Routes>
