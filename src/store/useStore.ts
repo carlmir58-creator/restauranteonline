@@ -197,6 +197,15 @@ export const useStore = create<AppState>((set, get) => ({
   fetchInitialData: async () => {
     set({ isLoading: true });
     try {
+      const user = get().currentUser;
+      const restId = user?.restauranteId;
+      const isSuper = user?.rol === 'super_admin';
+
+      const filterByRest = <T,>(q: T & { eq: (col: string, val: any) => T }) => {
+        if (!isSuper && restId) return q.eq('restaurante_id', restId);
+        return q;
+      };
+
       const [
         { data: mesas },
         { data: categorias },
@@ -206,13 +215,13 @@ export const useStore = create<AppState>((set, get) => ({
         { data: movimientos_caja },
         { data: configuraciones }
       ] = await Promise.all([
-        supabase.from('mesas').select('*').order('numero'),
-        supabase.from('categorias').select('*').order('orden_visual'),
-        supabase.from('productos').select('*').order('nombre'),
-        supabase.from('perfiles').select('*'),
-        supabase.from('pagos').select('*').order('fecha', { ascending: false }),
-        supabase.from('movimientos_caja').select('*').order('fecha', { ascending: false }),
-        supabase.from('configuraciones').select('*')
+        filterByRest(supabase.from('mesas').select('*')).order('numero'),
+        filterByRest(supabase.from('categorias').select('*')).order('orden_visual'),
+        filterByRest(supabase.from('productos').select('*')).order('nombre'),
+        filterByRest(supabase.from('perfiles').select('*')),
+        filterByRest(supabase.from('pagos').select('*')).order('fecha', { ascending: false }),
+        filterByRest(supabase.from('movimientos_caja').select('*')).order('fecha', { ascending: false }),
+        filterByRest(supabase.from('configuraciones').select('*'))
       ]);
 
       set({
@@ -270,10 +279,14 @@ export const useStore = create<AppState>((set, get) => ({
       });
 
       // Fetch active orders OR orders from today
-      const { data: recentPedidos } = await supabase
+      let pedidosQuery = supabase
         .from('pedidos')
         .select('*, pedido_detalles(*)')
         .or(`pagado.eq.false,fecha.gte.${new Date(new Date().setHours(0,0,0,0)).toISOString()}`);
+      if (!isSuper && restId) {
+        pedidosQuery = pedidosQuery.eq('restaurante_id', restId);
+      }
+      const { data: recentPedidos } = await pedidosQuery;
 
       if (recentPedidos) {
         set({
@@ -405,7 +418,8 @@ export const useStore = create<AppState>((set, get) => ({
       mesa_id: mesaId,
       mesero_id: get().currentUser?.id,
       cliente,
-      observaciones
+      observaciones,
+      restaurante_id: get().currentUser?.restauranteId,
     }).select().single();
 
     if (error) {
@@ -446,7 +460,8 @@ export const useStore = create<AppState>((set, get) => ({
       cantidad,
       notas: notas || '',
       precio_unitario: producto.precio,
-      estado: 'pendiente'
+      estado: 'pendiente',
+      restaurante_id: get().currentUser?.restauranteId,
     }).select().single();
 
     if (error) {
@@ -531,7 +546,8 @@ export const useStore = create<AppState>((set, get) => ({
     const { data: pago, error } = await supabase.from('pagos').insert({
       pedido_id: pagoData.pedidoId,
       monto_total: pagoData.montoTotal,
-      metodo_pago: pagoData.metodoPago
+      metodo_pago: pagoData.metodoPago,
+      restaurante_id: get().currentUser?.restauranteId,
     }).select().single();
 
     if (error || !pago) {
@@ -585,7 +601,8 @@ export const useStore = create<AppState>((set, get) => ({
       precio: p.precio,
       categoria_id: p.categoriaId,
       activo: p.activo,
-      imagen_url: p.imagenUrl
+      imagen_url: p.imagenUrl,
+      restaurante_id: get().currentUser?.restauranteId,
     });
     if (!error) await get().fetchInitialData();
   },
@@ -603,13 +620,18 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addMesa: async (m) => {
-    const { error } = await supabase.from('mesas').insert(m);
+    const { error } = await supabase.from('mesas').insert({
+      ...m,
+      restaurante_id: get().currentUser?.restauranteId,
+    });
     if (!error) await get().fetchInitialData();
   },
 
   addUser: async (u) => {
-    // This usually requires Auth too, but for perfiles:
-    const { error } = await supabase.from('perfiles').insert(u);
+    const { error } = await supabase.from('perfiles').insert({
+      ...u,
+      restaurante_id: get().currentUser?.restauranteId,
+    });
     if (!error) await get().fetchInitialData();
   },
 
@@ -644,7 +666,8 @@ export const useStore = create<AppState>((set, get) => ({
       monto: m.monto,
       descripcion: m.descripcion,
       categoria: m.categoria,
-      usuario_id: get().currentUser?.id
+      usuario_id: get().currentUser?.id,
+      restaurante_id: get().currentUser?.restauranteId,
     }).select().single();
     
     if (error) {
@@ -672,7 +695,10 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   updateConfiguracion: async (key, value) => {
-    const { error } = await supabase.from('configuraciones').update({ value, updated_at: new Date().toISOString() }).eq('key', key);
+    const restId = get().currentUser?.restauranteId;
+    let query = supabase.from('configuraciones').update({ value, updated_at: new Date().toISOString() }).eq('key', key);
+    if (restId) query = query.eq('restaurante_id', restId);
+    const { error } = await query;
     if (error) {
       toast.error('Error al actualizar configuración');
       return;

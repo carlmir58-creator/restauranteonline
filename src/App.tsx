@@ -35,24 +35,31 @@ const AppRoutes = () => {
   const { currentUser, setSession, fetchInitialData, subscribeToChanges, isLoading } = useStore();
 
   useEffect(() => {
-    // 1. Obtener sesión inicial
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    let unsubscribe: (() => void) | null = null;
+
+    const init = async () => {
+      // 1. Obtener sesión inicial
+      const { data: { session } } = await supabase.auth.getSession();
+      await setSession(session);
+
+      // 2. Cargar datos (ahora con el usuario disponible para filtrar)
+      fetchInitialData();
+      unsubscribe = subscribeToChanges();
+    };
+
+    init();
+
+    // 3. Escuchar cambios de autenticación (login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      await setSession(session);
+      fetchInitialData(); // Recargar datos con el nuevo contexto
     });
 
-    // 2. Escuchar cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    fetchInitialData();
-    const unsubscribe = subscribeToChanges();
-    
     return () => {
       subscription.unsubscribe();
-      unsubscribe();
+      if (unsubscribe) unsubscribe();
     };
-  }, [fetchInitialData, subscribeToChanges, setSession]);
+  }, [setSession, fetchInitialData, subscribeToChanges]);
 
   if (isLoading) {
     return (
