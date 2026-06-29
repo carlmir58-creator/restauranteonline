@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { X, Plus, Minus, Trash2, Send, AlertCircle, Printer, CheckCircle2 } from 'lucide-react';
+import { X, Plus, Minus, Trash2, Send, AlertCircle, Printer, CheckCircle2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { printComanda } from '@/utils/print';
 
@@ -21,6 +21,7 @@ const NuevoPedido = ({ mesaId, onClose }: Props) => {
   );
 
   const [filtroCategoria, setFiltroCategoria] = useState<string>('all');
+  const [busqueda, setBusqueda] = useState('');
   const [notas, setNotas]     = useState('');
   const [cliente, setCliente] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -30,9 +31,11 @@ const NuevoPedido = ({ mesaId, onClose }: Props) => {
 
   const [cart, setCart] = useState<{ productoId: string; cantidad: number; notas: string }[]>([]);
 
-  const productosFiltrados = productos.filter(p =>
-    p.activo && (filtroCategoria === 'all' || p.categoriaId === filtroCategoria)
-  );
+  const productosFiltrados = productos.filter(p => {
+    if (!p.activo) return false;
+    if (busqueda) return p.nombre.toLowerCase().includes(busqueda.toLowerCase());
+    return filtroCategoria === 'all' || p.categoriaId === filtroCategoria;
+  });
 
   const addToCart = (productoId: string) => {
     setCart(c => {
@@ -181,26 +184,48 @@ const NuevoPedido = ({ mesaId, onClose }: Props) => {
           {/* Product selection */}
           <div className="flex-1 flex flex-col overflow-hidden border-r border-border max-md:border-r-0 max-md:border-b">
             {/* Category filter */}
-            <div className="flex gap-2 p-3 overflow-x-auto shrink-0 border-b border-border">
-              <button
-                onClick={() => setFiltroCategoria('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                  filtroCategoria === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'
-                }`}
-              >
-                Todos
-              </button>
-              {categorias.map(c => (
+            {!busqueda && (
+              <div className="flex gap-2 p-3 overflow-x-auto shrink-0 border-b border-border">
                 <button
-                  key={c.id}
-                  onClick={() => setFiltroCategoria(c.id)}
+                  onClick={() => setFiltroCategoria('all')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                    filtroCategoria === c.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'
+                    filtroCategoria === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'
                   }`}
                 >
-                  {c.nombre}
+                  Todos
                 </button>
-              ))}
+                {categorias.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => setFiltroCategoria(c.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                      filtroCategoria === c.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'
+                    }`}
+                  >
+                    {c.nombre}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Search bar */}
+            <div className="relative p-3 pb-0">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Buscar productos..."
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 rounded-lg bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 ring-primary/30"
+              />
+              {busqueda && (
+                <button
+                  onClick={() => setBusqueda('')}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             {/* Products grid */}

@@ -41,9 +41,8 @@ export function buildReceiptHTML(params: PrintReceiptParams): string {
   const hora  = now.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
 
   const subtotal = pedido.items.reduce((s, i) => s + i.precio * i.cantidad, 0);
-  const impuesto = subtotal * 0.16;
   const propina  = pago?.propina || 0;
-  const total    = subtotal + impuesto + propina;
+  const total    = subtotal + propina;
   const recibido = pago?.recibido || 0;
   const cambio   = recibido - total;
 
@@ -115,7 +114,6 @@ export function buildReceiptHTML(params: PrintReceiptParams): string {
   ${itemsHTML}
   <div class="divider"></div>
   <div class="total-row"><span>Subtotal</span><span>$${subtotal.toFixed(2)}</span></div>
-  <div class="total-row"><span>IVA (16%)</span><span>$${impuesto.toFixed(2)}</span></div>
   ${propina > 0 ? `<div class="total-row"><span>Propina</span><span>$${propina.toFixed(2)}</span></div>` : ''}
   <div class="divider-solid"></div>
   <div class="total-row grand-total"><span>TOTAL</span><span>$${total.toFixed(2)}</span></div>

@@ -50,9 +50,16 @@ const AppRoutes = () => {
     init();
 
     // 3. Escuchar cambios de autenticación (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        // En SIGNED_OUT, solo limpiar estado. No recargar datos.
+        await setSession(null);
+        return;
+      }
       await setSession(session);
-      fetchInitialData(); // Recargar datos con el nuevo contexto
+      if (session?.user) {
+        fetchInitialData();
+      }
     });
 
     return () => {

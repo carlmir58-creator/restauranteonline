@@ -8,8 +8,6 @@ import { MetodoPago, Pago } from '@/types';
 import { toast } from 'sonner';
 import { printReceipt, printEgreso } from '@/utils/print';
 
-const IMPUESTO_RATE = 0.16;
-
 type Tab = 'cobrar' | 'historial' | 'egresos';
 
 const Caja = () => {
@@ -36,9 +34,8 @@ const Caja = () => {
   const mesa   = pedido ? mesas.find(m => m.id === pedido.mesaId) : null;
 
   const subtotal    = pedido?.items.reduce((s, i) => s + i.precio * i.cantidad, 0) || 0;
-  const impuesto    = subtotal * IMPUESTO_RATE;
   const propinaVal  = parseFloat(propina) || 0;
-  const total       = subtotal + impuesto + propinaVal;
+  const total       = subtotal + propinaVal;
   const recibidoVal = parseFloat(recibido) || 0;
   const cambio      = recibidoVal - total;
 
@@ -191,7 +188,7 @@ const Caja = () => {
                     >
                       <div className="flex justify-between items-center decoration-primary">
                         <span className="text-lg font-bold">Mesa #{m?.numero}</span>
-                        <span className="text-lg font-bold text-primary">${(t * (1 + IMPUESTO_RATE)).toFixed(2)}</span>
+                        <span className="text-lg font-bold text-primary">${t.toFixed(2)}</span>
                       </div>
                       <p className="text-xs text-muted-foreground truncate mt-1">
                         {p.items.length} productos {p.cliente ? `· ${p.cliente}` : ''}
@@ -217,7 +214,6 @@ const Caja = () => {
                 </div>
                 <div className="border-t border-border pt-3 space-y-1">
                   <div className="flex justify-between text-sm"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-sm"><span>IVA (16%)</span><span>${impuesto.toFixed(2)}</span></div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Propina</span>
                     <input type="number" value={propina} onChange={e=>setPropina(e.target.value)} className="w-20 bg-muted border border-border rounded px-2 text-right py-1" placeholder="0" />

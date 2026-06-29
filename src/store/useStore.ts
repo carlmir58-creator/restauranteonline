@@ -197,9 +197,13 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   fetchInitialData: async () => {
+    const user = get().currentUser;
+    if (!user) {
+      set({ isLoading: false });
+      return;
+    }
     set({ isLoading: true });
     try {
-      const user = get().currentUser;
       const restId = user?.restauranteId;
       const isSuper = user?.rol === 'super_admin';
 
@@ -442,20 +446,27 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   signOut: async () => {
-    await supabase.auth.signOut();
-    set({ currentUser: null, session: null });
+    // Limpiar estado INMEDIATAMENTE para reflejar el cambio en UI
+    set({ currentUser: null, session: null, currentRestaurant: null });
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Ignorar errores de red al cerrar sesión
+    }
+    // Asegurar limpieza incluso si onAuthStateChange no se dispara
+    set({ currentUser: null, session: null, currentRestaurant: null });
   },
 
   setSession: async (session) => {
     set({ session });
     if (session?.user) {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('perfiles')
         .select('*')
         .eq('id', session.user.id)
         .single();
       
-      if (profile) {
+      if (profile && !profileError) {
         const user: User = {
           id: profile.id,
           nombre: profile.nombre,
@@ -478,9 +489,13 @@ export const useStore = create<AppState>((set, get) => ({
             set({ currentRestaurant: restaurant });
           }
         }
+      } else {
+        // Perfil no encontrado o error de autenticación → limpiar sesión
+        set({ currentUser: null, currentRestaurant: null });
+        await supabase.auth.signOut();
       }
     } else {
-      set({ currentUser: null });
+      set({ currentUser: null, currentRestaurant: null });
     }
   },
 
