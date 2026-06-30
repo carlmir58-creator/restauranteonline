@@ -1,30 +1,68 @@
-# Agent Context: Orderly Eats (RestoPOS)
+# Orderly Eats (RestoPOS) - Contexto del Proyecto
 
-## 📋 Descripción del Proyecto
-**Orderly Eats** es un sistema moderno de Punto de Venta (POS) diseñado específicamente para el sector gastronómico (restaurantes, bares, cafeterías). El objetivo principal es digitalizar y optimizar todo el flujo de trabajo de un establecimiento, desde la toma de pedidos en mesa hasta la gestión en cocina/barra y el cobro final.
+## Stack
 
-## 🛠 Stack Tecnológico
-- **Frontend**: React 18 + TypeScript + Vite.
-- **Estilos**: Tailwind CSS + Shadcn UI (Componentes de alta calidad).
-- **Estado**: Zustand (Gestión fluida del estado global).
-- **Rutas**: React Router Dom.
-- **Gráficos**: Recharts (Para la sección de reportes).
-- **Pruebas**: Vitest.
+- Frontend: React 18 + TypeScript + Vite, Tailwind CSS + Shadcn UI, Zustand, React Router Dom, Recharts
+- Backend: Supabase (PostgreSQL, Auth, Realtime, Storage)
+- Package Manager: npm
+- Testing: Vitest
 
-## 🏗 Arquitectura del Proyecto
-La aplicación cuenta con diferentes vistas según el rol del usuario:
-- **Admin**: Gestión total de productos, usuarios, mesas y visualización de reportes económicos.
-- **Mesero**: Mapa interactivo de mesas, toma de pedidos y gestión de estados de mesa.
-- **Caja**: Procesamiento de pagos, control de movimientos de caja y cierre de pedidos.
-- **Cocina/Barra**: Visualización en tiempo real de los ítems pendientes por preparar, divididos por área de trabajo.
+## Supabase
 
-## 🚦 Estado Actual
-- **Frontend**: La interfaz de usuario está desarrollada en un ~90%. Las pantallas principales (Caja, Mesas, Cocina, Dashboard) son totalmente funcionales con datos simulados.
-- **Backend/DB**: Integrado con **Supabase** para persistencia de datos (PostgreSQL), autenticación real (Auth) y actualizaciones en tiempo real (Realtime).
-- **Pendiente**: Refinamiento de políticas RLS avanzadas y personalización de roles en el dashboard.
+## Repositorio GitHub
 
-## 📂 Estructura de Archivos Clave
-- `src/pages/`: Contiene las vistas principales (Mesas, Caja, Cocina, etc.).
-- `src/store/useStore.ts`: Estado global centralizado. Es el punto neurálgico para la migración a Supabase.
-- `src/components/`: Componentes reutilizables (Botones, Modales, Tarjetas de pedidos).
-- `src/data/mockData.ts`: Estructura de datos actual que debe replicarse en la base de datos SQL.
+- URL: https://github.com/carlmir58-creator/restauranteonline
+- Branch: main
+- Deploy: Vercel (restauranteonline-iota.vercel.app)
+
+## Sesión: 28 Jun 2026
+
+### Problema: Login roto tras ejecutar fase9
+
+- Usuario ejecutó fase9_fix_login_perfil.sql que reemplazó la política RLS con una subconsulta recursiva
+- Política problemática: `usuarios ven perfiles de su restaurante` con `restaurante_id = (SELECT restaurante_id FROM perfiles WHERE id = auth.uid())`
+- Esto causaba recursión infinita en PostgreSQL, la consulta del perfil fallaba silenciosamente
+- Resultado: `currentUser` se quedaba en null → usuario veía Login page sin poder entrar
+
+### Solución aplicada
+
+1. Se eliminó la política recursiva
+2. Se creó política simple: `usuarios ven su propio perfil` con `id = auth.uid()`
+3. Se creó función `get_user_restaurante_id()` con SECURITY DEFINER para evitar recursión
+4. Se creó política complementaria para que admins vean perfiles de su restaurante usando la función
+
+SQL de corrección:
+
+```sql
+DROP POLICY IF EXISTS "usuarios ven perfiles de su restaurante" ON perfiles;
+CREATE POLICY "usuarios ven su propio perfil" ON perfiles FOR SELECT
+  USING (id = auth.uid());
+CREATE OR REPLACE FUNCTION public.get_user_restaurante_id()
+RETURNS UUID LANGUAGE SQL STABLE SECURITY DEFINER
+AS $$ SELECT restaurante_id FROM public.perfiles WHERE id = auth.uid(); $$;
+CREATE POLICY "usuarios ven perfiles de su restaurante" ON perfiles FOR SELECT
+  USING (
+    get_user_restaurante_id() IS NOT NULL
+    AND (
+      restaurante_id = get_user_restaurante_id()
+      OR (SELECT rol FROM public.perfiles WHERE id = auth.uid()) = 'super_admin'
+    )
+  );
+```
+
+### Archivos SQL ejecutados en BD
+
+- fase9_fix_login_perfil.sql (perfil carlmir58 + RLS)
+- fase11_update_trigger.sql (trigger handle_new_user)
+- SQL de corrección RLS (get_user_restaurante_id)
+
+### Estado actual
+
+- Local funciona correctamente
+- Vercel requirió redeploy manual tras push a GitHub
+- Ya funciona en producción
+
+### Pendiente
+
+- Fase 5: Mejoras funcionales (impresión, reportes, inventario, tests)
+- Verificar que usuarios nuevos creados via trigger tengan restaurante_id correcto

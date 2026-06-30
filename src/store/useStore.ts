@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+
+let _fetchPromise: Promise<void> | null = null;
 import { 
   User, Mesa, Producto, Categoria, Pedido, PedidoDetalle, 
   Pago, MovimientoCaja, ItemEstado, MesaEstado, Configuracion,
@@ -197,129 +199,138 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   fetchInitialData: async () => {
-    const user = get().currentUser;
-    if (!user) {
-      set({ isLoading: false });
-      return;
-    }
-    set({ isLoading: true });
-    try {
-      const restId = user?.restauranteId;
-      const isSuper = user?.rol === 'super_admin';
+    if (_fetchPromise) return _fetchPromise;
 
-      const filterByRest = <T,>(q: T & { eq: (col: string, val: any) => T }) => {
-        if (!isSuper && restId) return q.eq('restaurante_id', restId);
-        return q;
-      };
-
-      const [
-        { data: mesas },
-        { data: categorias },
-        { data: productos },
-        { data: perfiles },
-        { data: pagos },
-        { data: movimientos_caja },
-        { data: configuraciones }
-      ] = await Promise.all([
-        filterByRest(supabase.from('mesas').select('*')).order('numero'),
-        filterByRest(supabase.from('categorias').select('*')).order('orden_visual'),
-        filterByRest(supabase.from('productos').select('*')).order('nombre'),
-        filterByRest(supabase.from('perfiles').select('*')),
-        filterByRest(supabase.from('pagos').select('*')).order('fecha', { ascending: false }),
-        filterByRest(supabase.from('movimientos_caja').select('*')).order('fecha', { ascending: false }),
-        filterByRest(supabase.from('configuraciones').select('*'))
-      ]);
-
-      set({
-        mesas: mesas || [],
-        categorias: (categorias || []).map(c => ({
-          id: c.id,
-          nombre: c.nombre,
-          color: c.color,
-          ordenVisual: c.orden_visual,
-          areaProduccion: c.area_produccion
-        })),
-        productos: (productos || []).map(p => {
-          const cat = (categorias || []).find(c => c.id === p.categoria_id);
-          return {
-            id: p.id,
-            nombre: p.nombre,
-            descripcion: p.descripcion,
-            precio: Number(p.precio),
-            categoriaId: p.categoria_id,
-            area: (cat?.nombre.toLowerCase().includes('bebida') || cat?.area_produccion === 'barra') ? 'barra' : 'cocina',
-            activo: p.activo,
-            imagenUrl: p.imagen_url,
-            disponible: p.disponible,
-            tiempoPreparacionMin: p.tiempo_preparacion_min,
-            disponibleHoraInicio: p.disponible_hora_inicio,
-            disponibleHoraFin: p.disponible_hora_fin
-          };
-        }),
-        users: (perfiles || []).map(u => ({
-          id: u.id,
-          nombre: u.nombre,
-          rol: u.rol,
-          activo: u.activo,
-          restauranteId: u.restaurante_id,
-        })),
-        pagos: (pagos || []).map(p => ({
-          id: p.id,
-          pedidoId: p.pedido_id,
-          montoTotal: Number(p.monto_total),
-          metodoPago: p.metodo_pago,
-          fecha: p.fecha
-        })),
-        movimientosCaja: (movimientos_caja || []).map(m => ({
-          id: m.id,
-          tipo: m.tipo,
-          monto: Number(m.monto),
-          descripcion: m.descripcion,
-          categoria: m.categoria,
-          fecha: m.fecha,
-          userId: m.usuario_id
-        })),
-        configuraciones: (configuraciones || []).reduce((acc, c) => ({ ...acc, [c.key]: c.value }), {
-          impresion_separada_barra: false,
-          produccion_digital_habilitada: true,
-        })
-      });
-
-      // Fetch active orders OR orders from today
-      let pedidosQuery = supabase
-        .from('pedidos')
-        .select('*, pedido_detalles(*)')
-        .or(`pagado.eq.false,fecha.gte.${new Date(new Date().setHours(0,0,0,0)).toISOString()}`);
-      if (!isSuper && restId) {
-        pedidosQuery = pedidosQuery.eq('restaurante_id', restId);
+    const promise = (async () => {
+      const user = get().currentUser;
+      if (!user) {
+        set({ isLoading: false });
+        _fetchPromise = null;
+        return;
       }
-      const { data: recentPedidos } = await pedidosQuery;
+      set({ isLoading: true });
+      try {
+        const restId = user?.restauranteId;
+        const isSuper = user?.rol === 'super_admin';
 
-      if (recentPedidos) {
+        const filterByRest = <T,>(q: T & { eq: (col: string, val: any) => T }) => {
+          if (!isSuper && restId) return q.eq('restaurante_id', restId);
+          return q;
+        };
+
+        const [
+          { data: mesas },
+          { data: categorias },
+          { data: productos },
+          { data: perfiles },
+          { data: pagos },
+          { data: movimientos_caja },
+          { data: configuraciones }
+        ] = await Promise.all([
+          filterByRest(supabase.from('mesas').select('*')).order('numero'),
+          filterByRest(supabase.from('categorias').select('*')).order('orden_visual'),
+          filterByRest(supabase.from('productos').select('*')).order('nombre'),
+          filterByRest(supabase.from('perfiles').select('*')),
+          filterByRest(supabase.from('pagos').select('*')).order('fecha', { ascending: false }),
+          filterByRest(supabase.from('movimientos_caja').select('*')).order('fecha', { ascending: false }),
+          filterByRest(supabase.from('configuraciones').select('*'))
+        ]);
+
         set({
-          pedidos: recentPedidos.map(p => ({
+          mesas: mesas || [],
+          categorias: (categorias || []).map(c => ({
+            id: c.id,
+            nombre: c.nombre,
+            color: c.color,
+            ordenVisual: c.orden_visual,
+            areaProduccion: c.area_produccion
+          })),
+          productos: (productos || []).map(p => {
+            const cat = (categorias || []).find(c => c.id === p.categoria_id);
+            return {
+              id: p.id,
+              nombre: p.nombre,
+              descripcion: p.descripcion,
+              precio: Number(p.precio),
+              categoriaId: p.categoria_id,
+              area: (cat?.nombre.toLowerCase().includes('bebida') || cat?.area_produccion === 'barra') ? 'barra' : 'cocina',
+              activo: p.activo,
+              imagenUrl: p.imagen_url,
+              disponible: p.disponible,
+              tiempoPreparacionMin: p.tiempo_preparacion_min,
+              disponibleHoraInicio: p.disponible_hora_inicio,
+              disponibleHoraFin: p.disponible_hora_fin
+            };
+          }),
+          users: (perfiles || []).map(u => ({
+            id: u.id,
+            nombre: u.nombre,
+            rol: u.rol,
+            activo: u.activo,
+            restauranteId: u.restaurante_id,
+          })),
+          pagos: (pagos || []).map(p => ({
             id: p.id,
-            mesaId: p.mesa_id,
-            meseroId: p.mesero_id,
-            fecha: p.fecha,
-            cliente: p.cliente,
-            observaciones: p.observaciones,
-            pagado: p.pagado,
-            items: p.pedido_detalles.map((d: any) => ({
-              id: d.id,
-              pedidoId: d.pedido_id,
-              productoId: d.producto_id,
-              cantidad: d.cantidad,
-              notas: d.notas,
-              estado: d.estado,
-              precio: Number(d.precio_unitario)
-            }))
-          }))
+            pedidoId: p.pedido_id,
+            montoTotal: Number(p.monto_total),
+            metodoPago: p.metodo_pago,
+            fecha: p.fecha
+          })),
+          movimientosCaja: (movimientos_caja || []).map(m => ({
+            id: m.id,
+            tipo: m.tipo,
+            monto: Number(m.monto),
+            descripcion: m.descripcion,
+            categoria: m.categoria,
+            fecha: m.fecha,
+            userId: m.usuario_id
+          })),
+          configuraciones: (configuraciones || []).reduce((acc, c) => ({ ...acc, [c.key]: c.value }), {
+            impresion_separada_barra: false,
+            produccion_digital_habilitada: true,
+          })
         });
+
+        // Fetch active orders OR orders from today
+        let pedidosQuery = supabase
+          .from('pedidos')
+          .select('*, pedido_detalles(*)')
+          .or(`pagado.eq.false,fecha.gte.${new Date(new Date().setHours(0,0,0,0)).toISOString()}`);
+        if (!isSuper && restId) {
+          pedidosQuery = pedidosQuery.eq('restaurante_id', restId);
+        }
+        const { data: recentPedidos } = await pedidosQuery;
+
+        if (recentPedidos) {
+          set({
+            pedidos: recentPedidos.map(p => ({
+              id: p.id,
+              mesaId: p.mesa_id,
+              meseroId: p.mesero_id,
+              fecha: p.fecha,
+              cliente: p.cliente,
+              observaciones: p.observaciones,
+              pagado: p.pagado,
+              items: p.pedido_detalles.map((d: any) => ({
+                id: d.id,
+                pedidoId: d.pedido_id,
+                productoId: d.producto_id,
+                cantidad: d.cantidad,
+                notas: d.notas,
+                estado: d.estado,
+                precio: Number(d.precio_unitario)
+              }))
+            }))
+          });
+        }
+      } finally {
+        set({ isLoading: false });
+        _fetchPromise = null;
       }
-    } finally {
-      set({ isLoading: false });
-    }
+    })();
+
+    _fetchPromise = promise;
+    return promise;
   },
 
   login: async (userId) => {
@@ -331,26 +342,6 @@ export const useStore = create<AppState>((set, get) => ({
   signIn: async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error };
-
-    // Verificar si el perfil existe y está activo
-    if (data.user) {
-      const { data: profile } = await supabase
-        .from('perfiles')
-        .select('activo, nombre')
-        .eq('id', data.user.id)
-        .single();
-
-      if (!profile) {
-        await supabase.auth.signOut();
-        return { error: { message: 'Perfil no encontrado. Contacta al administrador.' } };
-      }
-
-      if (!profile.activo) {
-        await supabase.auth.signOut();
-        return { error: { message: 'Tu cuenta está pendiente de activación. Contacta al administrador.' } };
-      }
-    }
-
     return { error: null };
   },
 
@@ -446,26 +437,28 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   signOut: async () => {
-    // 1. Limpiar estado inmediatamente para que la UI refleje el cambio
-    set({ currentUser: null, session: null, currentRestaurant: null, isLoading: false });
-    // 2. Forzar limpieza de localStorage de Supabase (por si la API falla)
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const projectRef = supabaseUrl?.split('.')[0]?.split('//')[1];
-      if (projectRef) {
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith(`sb-${projectRef}`)) localStorage.removeItem(key);
-        });
-      }
-    } catch {}
-    // 3. Intentar signOut en Supabase (scope: 'local' para no depender de red)
+    // 1. Cerrar canales Realtime primero (evitar fugas con JWT viejo)
+    try { supabase.removeAllChannels(); } catch { /* ignorar */ }
+    // 2. Limpiar TODO el estado de Zustand
+    set({
+      currentUser: null, session: null, currentRestaurant: null,
+      restaurantes: [], users: [], mesas: [], productos: [],
+      categorias: [], pedidos: [], pagos: [], movimientosCaja: [],
+      configuraciones: {}, isLoading: false
+    });
+    // 3. SignOut local en Supabase (él solo limpia localStorage internamente)
     try {
       await supabase.auth.signOut({ scope: 'local' });
     } catch {
       // Ignorar errores
     }
-    // 4. Re-asegurar estado limpio
-    set({ currentUser: null, session: null, currentRestaurant: null, isLoading: false });
+    // 4. Re-asegurar (por si el catch anterior falló silenciosamente)
+    set({
+      currentUser: null, session: null, currentRestaurant: null,
+      restaurantes: [], users: [], mesas: [], productos: [],
+      categorias: [], pedidos: [], pagos: [], movimientosCaja: [],
+      configuraciones: {}, isLoading: false
+    });
   },
 
   setSession: async (session) => {
@@ -491,19 +484,20 @@ export const useStore = create<AppState>((set, get) => ({
         if (profile.rol === 'super_admin') {
           get().fetchRestaurantes();
         } else if (profile.restaurante_id) {
-          const { data: restaurant } = await supabase
+          // Fire-and-forget: no bloquear fetchInitialData
+          supabase
             .from('restaurantes')
             .select('*')
             .eq('id', profile.restaurante_id)
-            .single();
-          if (restaurant) {
-            set({ currentRestaurant: restaurant });
-          }
+            .single()
+            .then(({ data: restaurant }) => {
+              if (restaurant) set({ currentRestaurant: restaurant });
+            });
         }
       } else {
-        // Perfil no encontrado o error de autenticación → limpiar sesión
+        // Perfil no encontrado → limpiar sesión local (sin llamar a signOut para evitar deadlock del lock interno)
         set({ currentUser: null, currentRestaurant: null });
-        await supabase.auth.signOut();
+        try { supabase.removeAllChannels(); } catch { /* ignorar */ }
       }
     } else {
       set({ currentUser: null, currentRestaurant: null });

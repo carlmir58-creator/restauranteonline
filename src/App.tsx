@@ -35,36 +35,34 @@ const AppRoutes = () => {
   const { currentUser, setSession, fetchInitialData, subscribeToChanges, isLoading } = useStore();
 
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
+    let unsubscribeRealtime: (() => void) | null = null;
 
-    const init = async () => {
-      // 1. Obtener sesión inicial
-      const { data: { session } } = await supabase.auth.getSession();
-      await setSession(session);
-
-      // 2. Cargar datos (ahora con el usuario disponible para filtrar)
-      fetchInitialData();
-      unsubscribe = subscribeToChanges();
-    };
-
-    init();
-
-    // 3. Escuchar cambios de autenticación (login/logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
-        // En SIGNED_OUT, solo limpiar estado. No recargar datos.
+        // Limpiar Realtime ANTES de limpiar sesión
+        if (unsubscribeRealtime) unsubscribeRealtime();
+        unsubscribeRealtime = null;
         await setSession(null);
         return;
       }
+      if (event === 'TOKEN_REFRESHED') {
+        // Solo refrescar sesión, no re-fetch completo ni Realtime
+        useStore.setState({ session });
+        return;
+      }
+      // INITIAL_SESSION y SIGNED_IN: mismo flujo
       await setSession(session);
       if (session?.user) {
         fetchInitialData();
       }
+      // Realtime se reconecta en cada SIGNED_IN (se limpia la anterior)
+      if (unsubscribeRealtime) unsubscribeRealtime();
+      unsubscribeRealtime = subscribeToChanges();
     });
 
     return () => {
       subscription.unsubscribe();
-      if (unsubscribe) unsubscribe();
+      if (unsubscribeRealtime) unsubscribeRealtime();
     };
   }, [setSession, fetchInitialData, subscribeToChanges]);
 
